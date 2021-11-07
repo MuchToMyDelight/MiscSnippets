@@ -30,3 +30,7 @@
 *.exe
 *.out
 *.app
+
+# llvm intermediate files
+*.ll
+*.bc
