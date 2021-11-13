@@ -27,6 +27,7 @@
 #include <llvm/Analysis/CGSCCPassManager.h>
 #include <llvm/Analysis/AliasAnalysis.h>
 #include <llvm/Passes/PassBuilder.h>
+#include <llvm/Transforms/Utils/Cloning.h>
 
 using namespace std;
 using namespace llvm;
@@ -34,6 +35,7 @@ using namespace llvm::orc;
 
 DEFINE_string(bcFile, "", "The pre-compiled llvm .bc file");
 DEFINE_int32(optLevel, 0, "the argument to -Ox: 0, 1, 2, 3");
+DEFINE_int32(var, 1, "The integer value bound to the argument of functions");
 
 namespace {
 ExitOnError ExitOnErr;
@@ -44,6 +46,7 @@ string prefix = "__jit_";
 void bindArgument(Module &m, char const *name, int val) {
     auto &cxt = m.getContext();
     auto oldF = m.getFunction(name); assert(oldF);
+    oldF->addFnAttr(Attribute::AlwaysInline);
     auto newF = Function::Create(
         FunctionType::get(Type::getInt32Ty(cxt), {}, false),
         Function::ExternalLinkage, 
@@ -54,6 +57,11 @@ void bindArgument(Module &m, char const *name, int val) {
     Value *args[] = {builder.getInt32(val)};
     auto call = builder.CreateCall(
         FunctionType::get(Type::getInt32Ty(cxt), {Type::getInt32Ty(cxt)}, false), oldF, args);
+#if 0
+    // something wrong with codes below, using addFnAttr instead
+    InlineFunctionInfo ifi;
+    InlineFunction(*call, ifi);
+#endif
     builder.CreateRet(call);
 }
 auto getBoundFunc(LLJIT &jit, char const *name, bool dump = false) {
@@ -67,16 +75,14 @@ auto loadModule() {
     auto context = make_unique<LLVMContext>();
     SMDiagnostic smd;
     auto m = parseIRFile(FLAGS_bcFile, smd, *context);
-    /*
-    m->print(llvm::errs(), nullptr);
-    auto fun = m->getFunction("add1");
-    assert(fun);
-    */
 
     // bind the argument and create new functions
     for (auto fn: funcs) {
-        bindArgument(*m, fn, 123/*arbitrary value, for testing*/);
+        bindArgument(*m, fn, FLAGS_var/*arbitrary value, for testing*/);
     }
+
+    cout<<"Before opt: **************\n";
+    m->print(llvm::errs(), nullptr);
 
     // do the optimization: the .bc file may already be compiled with optimizations, codes
     // below may don't need the whole passes
@@ -94,6 +100,8 @@ auto loadModule() {
     ModulePassManager MPM = PB.buildPerModuleDefaultPipeline(PassBuilder::OptimizationLevel::O3);
     MPM.run(*m, MAM);
 
+    cout<<"After opt: **************\n";
+    m->print(llvm::errs(), nullptr);
     return ThreadSafeModule(move(m), move(context));
 }
 }

@@ -1,0 +1,100 @@
+/////////////// Sample LLVM IR
+; Function Attrs: norecurse nounwind readnone willreturn
+define i32 @__jit_id() local_unnamed_addr #1 {
+  ret i32 8098
+}
+
+; Function Attrs: norecurse nounwind readnone sspstrong willreturn
+define i32 @__jit_add1() local_unnamed_addr #2 {
+  ret i32 8099
+}
+
+; Function Attrs: norecurse nounwind readnone sspstrong willreturn
+define i32 @__jit_times2() local_unnamed_addr #2 {
+  ret i32 16196
+}
+
+; Function Attrs: norecurse nounwind readnone sspstrong
+define i32 @__jit_squareroot() local_unnamed_addr #3 {
+squareroot.exit:
+  ret i32 89
+}
+
+; Function Attrs: norecurse nounwind readnone sspstrong
+define i32 @__jit_threeX_1() local_unnamed_addr #3 {
+  br label %.preheader.i
+
+.preheader.i:                                     ; preds = %10, %0
+  %1 = phi i32 [ %12, %10 ], [ 0, %0 ]
+  %2 = phi i32 [ %11, %10 ], [ 8098, %0 ]
+  %3 = and i32 %2, 1
+  %4 = icmp eq i32 %3, 0
+  br i1 %4, label %8, label %5
+
+5:                                                ; preds = %.preheader.i
+  %6 = mul nsw i32 %2, 3
+  %7 = add nsw i32 %6, 1
+  br label %10
+
+8:                                                ; preds = %.preheader.i
+  %9 = sdiv i32 %2, 2
+  br label %10
+
+10:                                               ; preds = %8, %5
+  %11 = phi i32 [ %7, %5 ], [ %9, %8 ]
+  %12 = add nuw nsw i32 %1, 1
+  %13 = icmp eq i32 %11, 1
+  br i1 %13, label %threeX_1.exit, label %.preheader.i, !llvm.loop !6
+
+threeX_1.exit:                                    ; preds = %10
+  ret i32 %12
+}
+
+/////////////// Sample assembly code, cmd is ./a.out --bcFile ./precompiled_func.bc --var 17
+$1 = 0x55555555fe54 "id"
+   0x7ffff7fa0090:	mov    eax,0x11
+   0x7ffff7fa0095:	ret    
+(gdb) 
+Continuing.
+call id: 17
+
+Breakpoint 2, main (argc=1, argv=0x7fffffffe588) at ./main.cc:124
+124	        cout<<"call "<<fn<<": "<<ptr()<<'\n';
+$2 = 0x55555555fe57 "add1"
+   0x7ffff7fa00a0:	mov    eax,0x12
+   0x7ffff7fa00a5:	ret    
+(gdb) 
+Continuing.
+call add1: 18
+
+Breakpoint 2, main (argc=1, argv=0x7fffffffe588) at ./main.cc:124
+124	        cout<<"call "<<fn<<": "<<ptr()<<'\n';
+$3 = 0x55555555fe5c "times2"
+   0x7ffff7fa00b0:	mov    eax,0x22
+   0x7ffff7fa00b5:	ret    
+(gdb) 
+Continuing.
+call times2: 34
+
+Breakpoint 2, main (argc=1, argv=0x7fffffffe588) at ./main.cc:124
+124	        cout<<"call "<<fn<<": "<<ptr()<<'\n';
+$4 = 0x55555555fe63 "squareroot"
+   0x7ffff7fa00c0:	mov    eax,0x4
+   0x7ffff7fa00c5:	ret    
+(gdb) c
+Continuing.
+call squareroot: 4
+
+Breakpoint 2, main (argc=1, argv=0x7fffffffe588) at ./main.cc:124
+124	        cout<<"call "<<fn<<": "<<ptr()<<'\n';
+$5 = 0x55555555fe6e "threeX_1"
+   0x7ffff7fa00d0:	mov    ecx,0x11
+   0x7ffff7fa00d5:	xor    eax,eax
+(gdb) x /5i ptr
+   0x7ffff7fa00d0:	mov    ecx,0x11
+   0x7ffff7fa00d5:	xor    eax,eax
+   0x7ffff7fa00d7:	jmp    0x7ffff7fa00f2
+   0x7ffff7fa00d9:	nop    DWORD PTR [rax+0x0]
+   0x7ffff7fa00e0:	mov    edx,ecx
+
+
